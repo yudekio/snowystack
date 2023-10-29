@@ -8,22 +8,33 @@ const ContextSettings& setSettings() {
 	return settings;
 }
 
+// random function
+
+std::default_random_engine generator(std::random_device{}());
+int random_number(std::default_random_engine& generator, const int& begin, const  int& end) {
+	std::uniform_int_distribution<int> distribution(begin, end);
+	return distribution(generator);
+}
+
 ////////////////// classes
 
 class Snowflake {
 public:
-	float x = 0, y = 0;
-	float speed = 10.0f;
+	float x;
+	float y;
+	float speed;
 	Sprite sprite;
+
+	Snowflake() : x(0), y(0), speed(10.f) {}
 };
 
 //
 
-class SnowyText {
+class SnowyText : public Text {
 private:
-	std::unique_ptr<Text> textObj = std::make_unique<Text>();
+	std::unique_ptr<Text> textObj;
 public:
-	SnowyText(const Font& font, const int& fontSize, const std::string& textValue, const Vector2f& vector) {
+	SnowyText(const Font& font, const int& fontSize, const std::string& textValue, const Vector2f& vector): textObj(std::make_unique<Text>()) {
 		textObj->setFont(font);
 		textObj->setCharacterSize(fontSize);
 		textObj->setFillColor(Color::Black);
@@ -37,7 +48,7 @@ public:
 		return *textObj;
 	}
 
-	void setString(const std::string& text) {
+	virtual void setString(const std::string& text) {
 		textObj->setString(text);
 	}
 };
@@ -48,10 +59,9 @@ class SnowySound {
 private:
 	SoundBuffer buffer;
 	Sound sound;
-	std::string text;
 public:
 
-	SnowySound(const std::string& path, const bool& isLooped) {
+	SnowySound(const std::string& path, bool isLooped) {
 		buffer.loadFromFile(path);
 		sound.setBuffer(buffer);
 		sound.setLoop(isLooped);
@@ -60,6 +70,7 @@ public:
 	void play() {
 		sound.play();
 	}
+
 	void stop() {
 		sound.stop();
 	}
@@ -68,16 +79,17 @@ public:
 
 //////////////////////////////////////////
 
-//////////////////// inits
+//////////////////// inits (better in class or func)
 
 RenderWindow window(VideoMode(320, 420), "Snowy Stack", sf::Style::Close, setSettings());
 
-const int M = 20; // height
-const int N = 10; // width
+
+constexpr int M = 20; // height
+constexpr int N = 10; // width
 
 int field[M][N] = { 0 }; // game field
 
-int figures[7][4] =
+constexpr int figures[7][4] =
 {
 	1,3,5,7, // I
 	2,4,5,7, // Z
@@ -95,21 +107,39 @@ struct Point
 
 Font font;
 
-SnowySound oneLineSound("resources\\bells.wav", false);
-SnowySound bgSound("resources\\bg_music.wav", true);
+const std::string oneLinePath("resources\\bells.wav");
+const std::string bgSoundPath("resources\\bg_music.wav");
+
+const std::string blockTexturePath("resources\\ice_cube.png");
+const std::string snowflake_png{ "resources\\snowflake.png" };
+const std::string cube_texture_png{ "resources\\ice_cube.png" };
+
+SnowySound oneLineSound(oneLinePath, false);
+SnowySound bgSound(bgSoundPath, true);
+
+// better name... if only i knew what it does
 
 std::vector<Point> a(4);
 std::vector<Point> b(4);
 
-int dx = 0; bool rotate = 0; int colorNum = 1; bool beginGame = true; int n = rand() % 7;
+int dx = 0; 
+bool rotate = 0; 
+int colorNum = 1; 
+bool beginGame = true; 
+// #include <random> in the future :)
+int n = random_number(generator, 0, 6);
 
-float timer = 0, delay = 0.3f;
+float timer = 0;
+float delay = 0.3f;
 
 int score = 0; // counter score
 
-auto snowflakes = std::make_unique<std::vector<Snowflake>>(); // snowflakes vector
+std::vector<Snowflake> snowflakes; // snowflakes vector
 auto snowflakeTexture = std::make_unique<Texture>();
 auto snowflake = std::make_unique<Snowflake>();
+
+// better use std::array<std::array<RectangleShape, N>, M> if you do not change size in runtime. 
+// THEN IT'S NOT WORKING
 
 std::vector<std::vector<RectangleShape>> cells(M, std::vector<RectangleShape>(N));
 
@@ -122,7 +152,8 @@ Sprite sprite;
 
 ///////////////////// functions
 
-const bool check(const std::vector<Point>& a)
+
+const bool checkBorder(const std::vector<Point>& a)
 {
 	for (const Point& p : a) {
 		if (p.x < 0 || p.x >= N || p.y >= M || field[p.y][p.x] != 0) {
@@ -154,21 +185,22 @@ void stopAllSounds() {
 	bgSound.stop();
 }
 
-
+constexpr int cell_count{ 4 };
 // rotation
 void rotateFunc() {
 	if (rotate)
 	{
-		Point* p = &a[1];
-		for (int i = 0; i < 4; i++)
+
+		Point &p = a[1];
+		for (int i = 0; i < cell_count; i++)
 		{
-			int x = a[i].y - p->y;
-			int y = a[i].x - p->x;
-			a[i].x = p->x - x;
-			a[i].y = p->y + y;
+			int x = a[i].y - p.y;
+			int y = a[i].x - p.x;
+			a[i].x = p.x - x;
+			a[i].y = p.y + y;
 		}
 
-		if (!check(a)) { for (int i = 0; i < 4; i++) a[i] = b[i]; }
+		if (!checkBorder(a)) { for (int i = 0; i < 4; i++) a[i] = b[i]; }
 
 	}
 }
@@ -177,13 +209,19 @@ void rotateFunc() {
 void brickFalling() {
 	if (timer > delay)
 	{
-		for (int i = 0; i < 4; i++) { b[i] = a[i]; a[i].y += 1; }
-		if (!check(a))
+		for (int i = 0; i < cell_count; i++) 
+		{ 
+			b[i] = a[i]; 
+			a[i].y += 1; 
+		}
+		if (!checkBorder(a))
 		{
-			for (int i = 0; i < 4; i++) field[b[i].y][b[i].x] = colorNum;
-			colorNum = 1 + rand() % 7;
-			n = rand() % 7;
-			for (int i = 0; i < 4; i++)
+			for (int i = 0; i < cell_count; i++) 
+				field[b[i].y][b[i].x] = colorNum;
+
+			colorNum = random_number(generator, 1, 7);
+			n = random_number(generator, 0, 6);
+			for (int i = 0; i < cell_count; i++)
 			{
 				a[i].x = figures[n][i] % 2;
 				a[i].y = figures[n][i] / 2;
@@ -199,7 +237,7 @@ void lineChecking() {
 
 	int k = M - 1;
 
-	for (int i = M - 1; i > 0; i--)
+	for (int i = M - 1; i >= 0; i--)
 	{
 		int count = 0;
 
@@ -232,19 +270,21 @@ void setWindowIcon(const std::string& iconPath) {
 
 
 void snowfallFunc(const std::string &texturePath) {
+	constexpr int snowflake_count{ 60 };
 
 	snowflakeTexture->loadFromFile(texturePath);
 
-	for (int i = 0; i < 60; i++) {
-		snowflake->x = rand() % 320;
-		snowflake->y = rand() % 420;
-		snowflake->speed = 40.0f + static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 50.0f;
+	// rand is bad??
+	for (int i = 0; i < snowflake_count; i++) {
+		snowflake->x = random_number(generator, 0, 320);
+		snowflake->y = random_number(generator, 0, 420);
+		snowflake->speed = 40.0f + random_number(generator, 0, 100);
 		snowflake->sprite.setTexture(*snowflakeTexture);
-		snowflake->sprite.setColor(Color(0 + rand() % (255 + 1), 231, 255, 100));
+		snowflake->sprite.setColor(Color(random_number(generator, 0, 255), random_number(generator, 200, 255), 255, 100));
 		snowflake->sprite.setScale(0.4f, 0.4f);
 		snowflake->sprite.setPosition(snowflake->x, snowflake->y);
 
-		snowflakes->push_back(*snowflake);
+		snowflakes.push_back(*snowflake);
 	}
 }
 
@@ -252,31 +292,34 @@ void snowfallFunc(const std::string &texturePath) {
 
 void setBlockTexture(const std::string& texturePath) {
 
-	blockTexture.loadFromFile("resources\\ice_cube.png");
+	blockTexture.loadFromFile(blockTexturePath);
 	sprite.setTexture(blockTexture);
 	sprite.setTextureRect(IntRect(0, 0, 18, 18));
 }
 
 
-
-void spawnBlocks(bool& beginGame) {
+bool spawnBlocks(bool beginGame) {
 	if (beginGame)
 	{
 		beginGame = false;
-		n = rand() % 7;
+		n = random_number(generator, 0, 6);
 		for (int i = 0; i < 4; i++)
 		{
 			a[i].x = figures[n][i] % 2;
 			a[i].y = figures[n][i] / 2;
 		}
 	}
-	dx = 0; rotate = 0; delay = 0.3;
+	dx = 0; 
+	rotate = 0; 
+	delay = 0.3;
+
+	return beginGame;
 }
 
 
 
 void drawingSnowflakes() {
-	for (const Snowflake& snowflake : *snowflakes) {
+	for (const Snowflake& snowflake : snowflakes) {
 		window.draw(snowflake.sprite);
 	}
 }
@@ -301,7 +344,7 @@ void drawingBlocks() {
 		}
 	drawingSnowflakes();
 
-	for (int i = 0; i < 4; i++)
+	for (int i = 0; i < cell_count; i++)
 	{
 		sprite.setPosition(a[i].x * 18, a[i].y * 18);
 		//sprite.move(64, 0);
@@ -340,6 +383,8 @@ void drawingText(const std::string &fontPath) {
 
 ///////////////////////// run
 
+const std::string font_otf{ "resources\\HomeChristmas.otf" };
+
 void run() {
 	Clock clock;
 	Clock clockSnowflake;
@@ -351,12 +396,12 @@ void run() {
 
 		float deltaTime = clockSnowflake.restart().asSeconds();
 		// Snowflakes falling
-		for (Snowflake& snowflake : *snowflakes) {
+		for (Snowflake& snowflake : snowflakes) {
 			snowflake.y += snowflake.speed * deltaTime;
 			snowflake.x += 20.f * deltaTime;
 			if (snowflake.y > 420) {
 				snowflake.y = -20.f;
-				snowflake.x = -30 + rand() % (320 - (-30) + 1);
+				snowflake.x = random_number(generator , -30,320);
 			}
 			snowflake.sprite.setPosition(snowflake.x, snowflake.y);
 		}
@@ -364,22 +409,41 @@ void run() {
 		Event event;
 		while (window.pollEvent(event))
 		{
-			if (event.type == Event::Closed)
+
+			switch (event.type) {
+			case Event::Closed:
 				window.close();
+				break;
+			}
+			if (event.type == Event::KeyPressed) {
+				switch (event.key.code) {
+				case Keyboard::Space:
+					rotate = true;
+					break;
+				case Keyboard::A:
+					dx = -1;
+					break;
+				case Keyboard::D:
+					dx = 1;
+					break;
 
+				}
 
-			if (event.type == Event::KeyPressed)
-				if (event.key.code == Keyboard::Space) rotate = true;
-				else if (event.key.code == Keyboard::A) dx = -1;
-				else if (event.key.code == Keyboard::D) dx = 1;
+			}
 		}
 
-		if (Keyboard::isKeyPressed(Keyboard::S)) delay = 0.05;
+		if (Keyboard::isKeyPressed(Keyboard::S))
+			delay = 0.05;
 
 
-		for (int i = 0; i < 4; i++) { b[i] = a[i]; a[i].x += dx; }
+		for (int i = 0; i < 4; i++) { 
+			b[i] = a[i]; 
+			a[i].x += dx; 
+		}
 
-		if (!check(a)) for (int i = 0; i < 4; i++) a[i] = b[i];
+		if (!checkBorder(a)) 
+			for (int i = 0; i < 4; i++) 
+				a[i] = b[i];
 
 
 		// rotation
@@ -391,13 +455,13 @@ void run() {
 		// line checking
 		lineChecking();
 
-		spawnBlocks(beginGame);
+		beginGame = spawnBlocks(beginGame);
 
 		// canvas
 		drawingBlocks();
 
 		// drawing text
-		drawingText("resources\\HomeChristmas.otf");
+		drawingText(font_otf);
 
 		window.display();
 
@@ -407,22 +471,16 @@ void run() {
 //////////////////////////////////
 
 
+
+
 int main()
 {
-	srand(time(0));
-
-	setWindowIcon("resources\\snowflake.png");
-
+	setWindowIcon(snowflake_png);
 	bgSound.play();
-
-	snowfallFunc("resources\\snowflake.png");
-
+	snowfallFunc(snowflake_png);
 	setCellsPosition(cells);
-
-	setBlockTexture("resources\\ice_cube.png");
-
+	setBlockTexture(cube_texture_png);
 	run();
-
 	stopAllSounds();
 
 	return 0;
