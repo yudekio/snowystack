@@ -10,31 +10,21 @@ const ContextSettings& setSettings() {
 
 // random function
 
-std::default_random_engine generator(std::random_device{}());
-int random_number(std::default_random_engine& generator, const int& begin, const  int& end) {
+
+int random_number(const int& begin, const  int& end) {
+	std::mt19937 generator(std::random_device{}());
 	std::uniform_int_distribution<int> distribution(begin, end);
 	return distribution(generator);
 }
 
 ////////////////// classes
 
-class Snowflake {
-public:
-	float x;
-	float y;
-	float speed;
-	Sprite sprite;
-
-	Snowflake() : x(0), y(0), speed(10.f) {}
-};
+Snowflake::Snowflake() : x(0), y(0), speed(10.f) {};
 
 //
 
-class SnowyText : public Text {
-private:
-	std::unique_ptr<Text> textObj;
-public:
-	SnowyText(const Font& font, const int& fontSize, const std::string& textValue, const Vector2f& vector): textObj(std::make_unique<Text>()) {
+
+SnowyText::SnowyText(const Font& font, const int& fontSize, const std::string& textValue, const Vector2f& vector): textObj(std::make_unique<Text>()) {
 		textObj->setFont(font);
 		textObj->setCharacterSize(fontSize);
 		textObj->setFillColor(Color::Black);
@@ -44,38 +34,30 @@ public:
 		textObj->setPosition(vector);
 	}
 
-	Text& getText() {
+Text& SnowyText::getText() {
 		return *textObj;
 	}
 
-	virtual void setString(const std::string& text) {
+	void SnowyText::setString(const std::string& text) {
 		textObj->setString(text);
 	}
-};
 
 //
 
-class SnowySound {
-private:
-	SoundBuffer buffer;
-	Sound sound;
-public:
-
-	SnowySound(const std::string& path, bool isLooped) {
+	SnowySound::SnowySound(const std::string& path, bool isLooped) {
 		buffer.loadFromFile(path);
 		sound.setBuffer(buffer);
 		sound.setLoop(isLooped);
 	}
 
-	void play() {
+	void SnowySound::play() {
 		sound.play();
 	}
 
-	void stop() {
+	void SnowySound::stop() {
 		sound.stop();
 	}
 
-};
 
 //////////////////////////////////////////
 
@@ -83,12 +65,10 @@ public:
 
 RenderWindow window(VideoMode(320, 420), "Snowy Stack", sf::Style::Close, setSettings());
 
-
-constexpr int M = 20; // height
-constexpr int N = 10; // width
+extern const int M = 20;
+constexpr int N = 10;
 
 int field[M][N] = { 0 }; // game field
-
 constexpr int figures[7][4] =
 {
 	1,3,5,7, // I
@@ -99,13 +79,6 @@ constexpr int figures[7][4] =
 	3,5,7,6, // J
 	2,3,4,5, // O
 };
-
-struct Point
-{
-	int x, y;
-};
-
-Font font;
 
 const std::string oneLinePath("resources\\bells.wav");
 const std::string bgSoundPath("resources\\bg_music.wav");
@@ -119,15 +92,15 @@ SnowySound bgSound(bgSoundPath, true);
 
 // better name... if only i knew what it does
 
-std::vector<Point> a(4);
-std::vector<Point> b(4);
+std::vector<Point>a(4);
+std::vector<Point>b(4);
 
 int dx = 0; 
 bool rotate = 0; 
 int colorNum = 1; 
 bool beginGame = true; 
 // #include <random> in the future :)
-int n = random_number(generator, 0, 6);
+int n = random_number(0, 6);
 
 float timer = 0;
 float delay = 0.3f;
@@ -143,8 +116,7 @@ auto snowflake = std::make_unique<Snowflake>();
 
 std::vector<std::vector<RectangleShape>> cells(M, std::vector<RectangleShape>(N));
 
-Texture blockTexture;
-Sprite sprite;
+
 
 ///////////////////////////////////////////
 
@@ -153,7 +125,7 @@ Sprite sprite;
 ///////////////////// functions
 
 
-const bool checkBorder(const std::vector<Point>& a)
+bool checkBorder(const std::vector<Point>& a)
 {
 	for (const Point& p : a) {
 		if (p.x < 0 || p.x >= N || p.y >= M || field[p.y][p.x] != 0) {
@@ -219,8 +191,8 @@ void brickFalling() {
 			for (int i = 0; i < cell_count; i++) 
 				field[b[i].y][b[i].x] = colorNum;
 
-			colorNum = random_number(generator, 1, 7);
-			n = random_number(generator, 0, 6);
+			colorNum = random_number(1, 7);
+			n = random_number(0, 6);
 			for (int i = 0; i < cell_count; i++)
 			{
 				a[i].x = figures[n][i] % 2;
@@ -276,11 +248,11 @@ void snowfallFunc(const std::string &texturePath) {
 
 	// rand is bad??
 	for (int i = 0; i < snowflake_count; i++) {
-		snowflake->x = random_number(generator, 0, 320);
-		snowflake->y = random_number(generator, 0, 420);
-		snowflake->speed = 40.0f + random_number(generator, 0, 100);
+		snowflake->x = random_number(0, 320);
+		snowflake->y = random_number(0, 420);
+		snowflake->speed = 40.0f + random_number(0, 100);
 		snowflake->sprite.setTexture(*snowflakeTexture);
-		snowflake->sprite.setColor(Color(random_number(generator, 0, 255), random_number(generator, 200, 255), 255, 100));
+		snowflake->sprite.setColor(Color(random_number(0, 255), random_number(200, 255), 255, 100));
 		snowflake->sprite.setScale(0.4f, 0.4f);
 		snowflake->sprite.setPosition(snowflake->x, snowflake->y);
 
@@ -302,7 +274,7 @@ bool spawnBlocks(bool beginGame) {
 	if (beginGame)
 	{
 		beginGame = false;
-		n = random_number(generator, 0, 6);
+		n = random_number(0, 6);
 		for (int i = 0; i < 4; i++)
 		{
 			a[i].x = figures[n][i] % 2;
@@ -401,7 +373,7 @@ void run() {
 			snowflake.x += 20.f * deltaTime;
 			if (snowflake.y > 420) {
 				snowflake.y = -20.f;
-				snowflake.x = random_number(generator , -30,320);
+				snowflake.x = random_number(-30,320);
 			}
 			snowflake.sprite.setPosition(snowflake.x, snowflake.y);
 		}
